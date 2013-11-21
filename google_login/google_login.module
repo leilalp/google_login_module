@@ -1,0 +1,101 @@
+<?php
+
+
+/**
+ * Implements hook_init().
+ */
+ 
+function google_login_init(){
+
+	if(arg(0)=='login'&& (isset($_SESSION['google_login_auth']) && $_SESSION['google_login_auth'])){
+		google_login_login_submit();
+	}
+
+}
+
+
+/**
+ * Implements hook_form_alter().
+ */
+ 
+function google_login_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'user_login' || $form_id == 'user_login_block') {
+    $form['submit_google'] = array(
+      '#type' => 'submit',
+      '#value' => t(''),
+      '#submit' => array('google_login_login_submit'),
+      '#limit_validation_errors' => array(),
+      '#weight' => 1000,
+    );
+    drupal_add_css(drupal_get_path('module', 'google_login') . '/google_login.css');
+  }
+}
+
+ 
+/** 
+ *	_google_login_login_submit()
+ * 	This function makes the login with a google user
+ */
+ 
+function google_login_login_submit(){
+	global $base_url;
+
+	$path = function_exists('libraries_get_path') ? libraries_get_path('openid') : 'sites/all/libraries/openid';
+	$file=$path.'/openid.php';
+	require_once $file;
+	
+	$openid = new LightOpenID($base_url);
+	
+	if ($openid->mode ) {
+	$_SESSION['google_login_auth']= FALSE;
+
+		if ($openid->mode == 'cancel') {
+			drupal_set_message("La autenticación ha sido cancelada.",'error');
+			drupal_goto('login');
+		} elseif ($openid->validate()){
+			$cuenta = $openid->getAttributes();
+			$usuarioData =_google_login_load_user($cuenta['contact/email']);
+
+			if ($usuarioData == null){
+				drupal_set_message('Lo sentimos, su cuenta no fue validada correctamente. Contacte a su administrador y vuelva a ingresar.','error');
+				drupal_goto('login');
+			}
+			$_SESSION['id_usuario']=$usuarioData->uid;
+			drupal_set_message('Se ha validado correctamente su cuenta. Bienvenido!');
+
+			$form_state['uid'] = $usuarioData->uid;
+			user_login_submit(array(), $form_state);
+			drupal_goto('home');
+
+		} else {
+			drupal_set_message("El usuario no se ha podido loguear.",'error');
+			drupal_goto('login');
+		}
+	} else {
+		$openid->identity = 'https://www.google.com/accounts/o8/id';
+		$openid->required = array(
+			'namePerson/first',
+			'namePerson/last',
+			'contact/email',
+		);
+		$openid->returnUrl = $base_url.'/login';
+		$_SESSION['google_login_auth']= TRUE;
+		drupal_goto($openid->authUrl());
+	} 
+
+}
+
+
+/**
+ * Function returns uid of passed google mail
+ */
+ 
+ function _google_login_load_user($email) {
+  $rs = db_select('users', 'users')
+    ->fields('users', array('uid'))
+    ->condition('mail', $email, '=')
+    ->execute()
+    ->fetchAssoc();
+
+  return empty($rs) ? NULL : user_load($rs['uid']);
+} 

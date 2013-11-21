@@ -1,0 +1,4 @@
+name = Google Login
+description = Permite el login con Google usando OpenID
+core = 7.x
+package = "TK MODULES"
