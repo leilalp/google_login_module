@@ -1,6 +1,5 @@
 <?php
 
-
 /**
  * Implements hook_init().
  */
@@ -13,6 +12,22 @@ function google_login_init(){
 
 }
 
+/**
+ * Implements hook_menu().
+ */
+function google_login_menu() {
+  $items = array();
+  $items['admin/config/services/google_login'] = array(
+    'title' => 'Login with Google',
+    'description' => 'Login with Google settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('google_login_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'file' => 'google_login.admin.inc',
+    'menu_name' => 'menu_name',
+  );
+  return $items;
+}
 
 /**
  * Implements hook_form_alter().
@@ -50,25 +65,25 @@ function google_login_login_submit(){
 	$_SESSION['google_login_auth']= FALSE;
 
 		if ($openid->mode == 'cancel') {
-			drupal_set_message("La autenticación ha sido cancelada.",'error');
+			drupal_set_message(variable_get('auth_cancel', "The authentication have been canceled"),'error');
 			drupal_goto('login');
 		} elseif ($openid->validate()){
 			$cuenta = $openid->getAttributes();
 			$usuarioData =_google_login_load_user($cuenta['contact/email']);
 
 			if ($usuarioData == null){
-				drupal_set_message('Lo sentimos, su cuenta no fue validada correctamente. Contacte a su administrador y vuelva a ingresar.','error');
+				drupal_set_message(variable_get('validation_failed', "Your account didn't pass the validation"),'error');
 				drupal_goto('login');
 			}
 			$_SESSION['id_usuario']=$usuarioData->uid;
-			drupal_set_message('Se ha validado correctamente su cuenta. Bienvenido!');
+			drupal_set_message(variable_get('validation_success', "Validation successful, Welcome!"));
 
 			$form_state['uid'] = $usuarioData->uid;
 			user_login_submit(array(), $form_state);
 			drupal_goto('home');
 
 		} else {
-			drupal_set_message("El usuario no se ha podido loguear.",'error');
+			drupal_set_message(variable_get('login_failed', "There was a problem on trying to log in the user"),'error');
 			drupal_goto('login');
 		}
 	} else {
@@ -78,7 +93,8 @@ function google_login_login_submit(){
 			'namePerson/last',
 			'contact/email',
 		);
-		$openid->returnUrl = $base_url.'/login';
+		//$openid->returnUrl = $base_url . variable_get('login_path', '/user');
+                $openid->returnUrl = $base_url.'/';
 		$_SESSION['google_login_auth']= TRUE;
 		drupal_goto($openid->authUrl());
 	} 
